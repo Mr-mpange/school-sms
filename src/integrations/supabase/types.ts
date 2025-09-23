@@ -14,7 +14,176 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admins: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          last_login: string | null
+          password_hash: string
+          school_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          last_login?: string | null
+          password_hash: string
+          school_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          last_login?: string | null
+          password_hash?: string
+          school_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          admin_id: string
+          content: string
+          created_at: string
+          failed_count: number
+          id: string
+          recipient_count: number
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string
+          success_count: number
+          updated_at: string
+        }
+        Insert: {
+          admin_id: string
+          content: string
+          created_at?: string
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string
+          content?: string
+          created_at?: string
+          failed_count?: number
+          id?: string
+          recipient_count?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string
+          success_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parents: {
+        Row: {
+          class_year: string | null
+          created_at: string
+          id: string
+          name: string | null
+          phone_number: string
+          region: string | null
+          student_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          class_year?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          phone_number: string
+          region?: string | null
+          student_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          class_year?: string | null
+          created_at?: string
+          id?: string
+          name?: string | null
+          phone_number?: string
+          region?: string | null
+          student_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sms_logs: {
+        Row: {
+          created_at: string
+          delivered_at: string | null
+          error_message: string | null
+          gateway_response: Json | null
+          id: string
+          message_id: string
+          parent_id: string
+          phone_number: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          gateway_response?: Json | null
+          id?: string
+          message_id: string
+          parent_id: string
+          phone_number: string
+          sent_at?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          delivered_at?: string | null
+          error_message?: string | null
+          gateway_response?: Json | null
+          id?: string
+          message_id?: string
+          parent_id?: string
+          phone_number?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_logs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_logs_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "parents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
