@@ -19,7 +19,17 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Temporary debug banner: if you still see this, React did NOT mount. -->
+      <div style="padding:16px;margin:16px;border:3px dashed #f00;color:#111;background:#fffbe6;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;">
+        <strong>Debug:</strong> App shell loaded. If this yellow banner remains after a few seconds, React did <em>not</em> mount. Check browser Console for logs from [main]/[App] and Network for /src/main.tsx.
+      </div>
+      <noscript>
+        <div style="padding:16px;margin:16px;border:3px dashed #f00;color:#111;background:#fff2f0;font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;">
+          JavaScript is disabled. Please enable JavaScript to run this app.
+        </div>
+      </noscript>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
