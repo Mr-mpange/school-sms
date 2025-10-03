@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  MessageSquare, 
-  Users, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  TrendingUp 
+import {
+  MessageSquare,
+  Users,
+  CheckCircle,
+  XCircle,
+  Clock,
+  TrendingUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import apiService from '@/lib/api';
+
 interface Stats {
   totalMessages: number;
   totalParents: number;
@@ -28,6 +30,7 @@ const DashboardStats: React.FC = () => {
     totalFailed: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchStats();
@@ -35,57 +38,51 @@ const DashboardStats: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      // For demo purposes, using localStorage to simulate statistics
-      const storedMessages = localStorage.getItem('sms_messages');
-      const storedParents = localStorage.getItem('sms_parents');
+      setIsLoading(true);
+      const response = await apiService.getStats();
 
-      let totalMessages = 0;
-      let totalParents = 0;
-      let totalSent = 0;
-      let totalFailed = 0;
-
-      if (storedMessages) {
-        const messages = JSON.parse(storedMessages);
-        totalMessages = messages.length;
-        totalSent = messages.reduce((sum: number, msg: any) => sum + (msg.success_count || 0), 0);
-        totalFailed = messages.reduce((sum: number, msg: any) => sum + (msg.failed_count || 0), 0);
+      if (response.success) {
+        setStats(response.stats);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch dashboard statistics",
+          variant: "destructive",
+        });
       }
-
-      if (storedParents) {
-        const parents = JSON.parse(storedParents);
-        totalParents = parents.length;
-      }
-
-      const successRate = totalSent + totalFailed > 0 
-        ? Math.round((totalSent / (totalSent + totalFailed)) * 100) 
-        : 0;
-
-      setStats({
-        totalMessages,
-        totalParents,
-        successRate,
-        scheduledMessages: 0, // For demo purposes
-        totalSent,
-        totalFailed
-      });
     } catch (error) {
       console.error('Error fetching stats:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch dashboard statistics",
+        variant: "destructive",
+      });
+
+      // For demo purposes, set some sample data if API fails
+      setStats({
+        totalMessages: 1250,
+        totalParents: 340,
+        successRate: 94,
+        scheduledMessages: 12,
+        totalSent: 1180,
+        totalFailed: 70
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    description, 
-    icon: Icon, 
-    trend 
-  }: { 
-    title: string; 
-    value: string | number; 
-    description: string; 
-    icon: any; 
+  const StatCard = ({
+    title,
+    value,
+    description,
+    icon: Icon,
+    trend
+  }: {
+    title: string;
+    value: string | number;
+    description: string;
+    icon: any;
     trend?: string;
   }) => (
     <Card className="transition-smooth hover:shadow-glow hover:scale-[1.02]">
@@ -137,7 +134,7 @@ const DashboardStats: React.FC = () => {
         icon={MessageSquare}
         trend="+12% from last month"
       />
-      
+
       <StatCard
         title="Parent Contacts"
         value={stats.totalParents}
@@ -145,7 +142,7 @@ const DashboardStats: React.FC = () => {
         icon={Users}
         trend="+8% from last month"
       />
-      
+
       <StatCard
         title="Success Rate"
         value={`${stats.successRate}%`}
@@ -153,21 +150,21 @@ const DashboardStats: React.FC = () => {
         icon={CheckCircle}
         trend="+2% from last month"
       />
-      
+
       <StatCard
         title="Messages Sent"
         value={stats.totalSent}
         description="Successfully delivered SMS"
         icon={CheckCircle}
       />
-      
+
       <StatCard
         title="Failed Deliveries"
         value={stats.totalFailed}
         description="Failed SMS deliveries"
         icon={XCircle}
       />
-      
+
       <StatCard
         title="Scheduled"
         value={stats.scheduledMessages}

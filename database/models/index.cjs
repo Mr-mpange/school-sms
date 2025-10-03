@@ -6,7 +6,7 @@ const Sequelize = require('sequelize');
 const process = require('process');
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-const config = require(__dirname + '/../config/config.js')[env];
+const config = require(__dirname + '/../config/config.cjs')[env];
 const db = {};
 
 let sequelize;
@@ -31,8 +31,8 @@ fs
     return (
       file.indexOf('.') !== 0 &&
       file !== basename &&
-      file.slice(-3) === '.js' &&
-      file.indexOf('.test.js') !== basename.indexOf('.test.js')
+      file.slice(-4) === '.cjs' &&
+      file.indexOf('.test.cjs') !== basename.indexOf('.test.cjs')
     );
   })
   .forEach(file => {
