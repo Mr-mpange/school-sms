@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Search,
-  Users,
-  Phone,
-  GraduationCap,
+import { 
+  Search, 
+  Users, 
+  Phone, 
+  GraduationCap, 
   User,
   Filter,
   Trash2,
@@ -126,7 +126,7 @@ const ParentsManager: React.FC = () => {
       const updatedParents = parents.filter(p => p.id !== parentId);
       setParents(updatedParents);
       localStorage.setItem('sms_parents', JSON.stringify(updatedParents));
-
+      
       toast({
         title: "Contact Deleted",
         description: "Parent contact has been removed successfully"
@@ -181,7 +181,7 @@ const ParentsManager: React.FC = () => {
                 className="pl-10"
               />
             </div>
-
+            
             <Select value={classFilter} onValueChange={setClassFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by class" />
@@ -195,7 +195,7 @@ const ParentsManager: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-
+            
             <Select value={regionFilter} onValueChange={setRegionFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by region" />
@@ -222,7 +222,7 @@ const ParentsManager: React.FC = () => {
                 <Users className="w-8 h-8 opacity-75" />
               </div>
             </div>
-
+            
             <div className="bg-gradient-subtle border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -234,7 +234,7 @@ const ParentsManager: React.FC = () => {
                 <GraduationCap className="w-8 h-8 text-primary" />
               </div>
             </div>
-
+            
             <div className="bg-gradient-subtle border rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -243,7 +243,7 @@ const ParentsManager: React.FC = () => {
                     {getUniqueValues('region').length}
                   </p>
                 </div>
-                <Filter className="w-8 h-8 text-primary" />
+                <MapPin className="w-8 h-8 text-primary" />
               </div>
             </div>
           </div>
@@ -253,56 +253,87 @@ const ParentsManager: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Phone Number</TableHead>
-                  <TableHead>Parent Name</TableHead>
-                  <TableHead>Student Name</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Added</TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <Phone className="w-4 h-4" />
+                      <span>Phone Number</span>
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Parent Name</span>
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Student Name</span>
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <GraduationCap className="w-4 h-4" />
+                      <span>Class</span>
+                    </div>
+                  </TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>Region</span>
+                    </div>
+                  </TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredParents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       <div className="text-muted-foreground">
                         <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
                         <p>No parent contacts found</p>
-                        <p className="text-sm">Upload a contact file to get started</p>
+                        <p className="text-sm">Upload a contact list to get started</p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredParents.map((parent) => (
                     <TableRow key={parent.id} className="hover:bg-muted/50">
-                      <TableCell className="font-mono">{parent.phone_number}</TableCell>
-                      <TableCell>
-                        {parent.name || <span className="text-muted-foreground">—</span>}
+                      <TableCell className="font-mono">
+                        {parent.phone_number}
                       </TableCell>
                       <TableCell>
-                        {parent.student_name || <span className="text-muted-foreground">—</span>}
+                        {parent.name || <span className="text-muted-foreground italic">Not provided</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {parent.class_year || <span className="text-muted-foreground">—</span>}
-                        </Badge>
+                        {parent.student_name || <span className="text-muted-foreground italic">Not provided</span>}
                       </TableCell>
                       <TableCell>
-                        {parent.region || <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(parent.created_at).toLocaleDateString()}
+                        {parent.class_year ? (
+                          <Badge variant="outline">{parent.class_year}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground italic">Not set</span>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteParent(parent.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {parent.region ? (
+                          <Badge variant="secondary">{parent.region}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground italic">Not set</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteParent(parent.id)}
+                            className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

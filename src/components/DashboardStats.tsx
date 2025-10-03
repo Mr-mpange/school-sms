@@ -8,8 +8,7 @@ import {
   Clock, 
   TrendingUp 
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-
+import { useToast } from '@/hooks/use-toast';
 interface Stats {
   totalMessages: number;
   totalParents: number;
@@ -36,35 +35,25 @@ const DashboardStats: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      // Get total messages
-      const { count: totalMessages } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true });
+      // For demo purposes, using localStorage to simulate statistics
+      const storedMessages = localStorage.getItem('sms_messages');
+      const storedParents = localStorage.getItem('sms_parents');
 
-      // Get total parents
-      const { count: totalParents } = await supabase
-        .from('parents')
-        .select('*', { count: 'exact', head: true });
-
-      // Get scheduled messages
-      const { count: scheduledMessages } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'scheduled');
-
-      // Get message statistics
-      const { data: messageStats } = await supabase
-        .from('messages')
-        .select('success_count, failed_count, status');
-
+      let totalMessages = 0;
+      let totalParents = 0;
       let totalSent = 0;
       let totalFailed = 0;
 
-      if (messageStats) {
-        messageStats.forEach(msg => {
-          totalSent += msg.success_count || 0;
-          totalFailed += msg.failed_count || 0;
-        });
+      if (storedMessages) {
+        const messages = JSON.parse(storedMessages);
+        totalMessages = messages.length;
+        totalSent = messages.reduce((sum: number, msg: any) => sum + (msg.success_count || 0), 0);
+        totalFailed = messages.reduce((sum: number, msg: any) => sum + (msg.failed_count || 0), 0);
+      }
+
+      if (storedParents) {
+        const parents = JSON.parse(storedParents);
+        totalParents = parents.length;
       }
 
       const successRate = totalSent + totalFailed > 0 
@@ -72,10 +61,10 @@ const DashboardStats: React.FC = () => {
         : 0;
 
       setStats({
-        totalMessages: totalMessages || 0,
-        totalParents: totalParents || 0,
+        totalMessages,
+        totalParents,
         successRate,
-        scheduledMessages: scheduledMessages || 0,
+        scheduledMessages: 0, // For demo purposes
         totalSent,
         totalFailed
       });

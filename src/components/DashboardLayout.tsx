@@ -15,12 +15,11 @@ import {
   User
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { authService } from '@/lib/auth';
 import MessageComposer from './MessageComposer';
 import ParentsManager from './ParentsManager';
 import MessageHistory from './MessageHistory';
 import DashboardStats from './DashboardStats';
-
 interface DashboardLayoutProps {
   user: any;
   onLogout: () => void;
@@ -32,24 +31,20 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ user, onLogout }) => 
 
   const handleLogout = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast({
-          title: "Logout Failed",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Logged Out",
-          description: "You have been successfully logged out."
-        });
-        onLogout();
+      const sessionToken = localStorage.getItem('sessionToken');
+      if (sessionToken) {
+        await authService.logout(sessionToken);
       }
+      localStorage.removeItem('sessionToken');
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out."
+      });
+      onLogout();
     } catch (err) {
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "An unexpected error occurred during logout",
         variant: "destructive"
       });
     }

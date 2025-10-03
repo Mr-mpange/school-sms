@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -87,8 +86,19 @@ const MessageComposer: React.FC = () => {
       const saved = localStorage.getItem('briq_sender_id') || '';
       if (saved) setSenderId(saved);
     } catch {}
-    // For demo purposes, assume SMS function is not available
-    setHasSmsFunction(false);
+    (async () => {
+      try {
+        const baseUrl = (import.meta as any).env?.VITE_SUPABASE_URL as string | undefined;
+        if (!baseUrl) {
+          setHasSmsFunction(false);
+          return;
+        }
+        const resp = await fetch(`${baseUrl}/functions/v1/send-sms`, { method: 'OPTIONS' });
+        setHasSmsFunction(resp.ok);
+      } catch {
+        setHasSmsFunction(false);
+      }
+    })();
   }, []);
 
   // Persist sender ID locally
@@ -150,30 +160,25 @@ const MessageComposer: React.FC = () => {
     try {
       setIsProcessing(true);
       setProcessingPhase('Loading recipients from database...');
-
-      // For demo purposes, using localStorage
-      const storedParents = localStorage.getItem('sms_parents');
-      if (!storedParents) {
-        toast({ title: 'No Data', description: 'No parent contacts found. Please add some contacts first.', variant: 'destructive' });
-        return;
-      }
-
-      let parents = JSON.parse(storedParents);
+      let query = supabase.from('parents').select('phone_number, created_at, class_year, region');
 
       if (segmentType === 'class' && dbClass) {
-        parents = parents.filter((p: any) => p.class_year === dbClass);
+        query = query.eq('class_year', dbClass);
       } else if (segmentType === 'region' && dbRegion) {
-        parents = parents.filter((p: any) => p.region === dbRegion);
+        query = query.eq('region', dbRegion);
       } else if (segmentType === 'class_region') {
-        if (dbClass) parents = parents.filter((p: any) => p.class_year === dbClass);
-        if (dbRegion) parents = parents.filter((p: any) => p.region === dbRegion);
+        if (dbClass) query = query.eq('class_year', dbClass);
+        if (dbRegion) query = query.eq('region', dbRegion);
       } else if (segmentType === 'recent') {
         const since = new Date();
         since.setDate(since.getDate() - (recentDays || 7));
-        parents = parents.filter((p: any) => new Date(p.created_at) >= since);
+        query = query.gte('created_at', since.toISOString());
       }
 
-      const numbers = Array.from(new Set(parents.map((p: any) => p.phone_number).filter(Boolean)));
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const numbers = Array.from(new Set((data || []).map(r => r.phone_number).filter(Boolean)));
       setExtractedNumbers(numbers);
       setParsedContacts([]); // Clear file-based preview when using DB
 
@@ -195,32 +200,37 @@ const MessageComposer: React.FC = () => {
     try {
       setIsProcessing(true);
       setProcessingPhase('Loading failed recipients from last message...');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
-      // For demo purposes, using localStorage
-      const storedMessages = localStorage.getItem('sms_messages');
-      if (!storedMessages) {
-        toast({ title: 'No Messages', description: 'No previous messages found.', variant: 'destructive' });
-        return;
+      const { data: lastMsg, error: lastMsgErr } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('admin_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (lastMsgErr) throw lastMsgErr;
+      if (!lastMsg) throw new Error('No previous message found');
+
+      let q = supabase
+        .from('sms_logs')
+        .select('phone_number,status')
+        .eq('message_id', lastMsg.id);
+      if (failureStatuses.length > 0) {
+        // include only selected failure statuses
+        q = q.in('status', failureStatuses as any);
+      } else {
+        q = q.eq('status', 'failed');
       }
+      const { data: logs, error: logsErr } = await q;
+      if (logsErr) throw logsErr;
 
-      const messages = JSON.parse(storedMessages);
-      if (messages.length === 0) {
-        toast({ title: 'No Messages', description: 'No previous messages found.', variant: 'destructive' });
-        return;
-      }
+      const numbers = Array.from(new Set((logs || []).map(l => l.phone_number)));
+      setExtractedNumbers(numbers);
+      setParsedContacts([]);
 
-      const lastMsg = messages[0]; // Most recent message
-
-      // For demo purposes, simulate failed recipients
-      const storedParents = localStorage.getItem('sms_parents');
-      if (storedParents) {
-        const parents = JSON.parse(storedParents);
-        // Simulate some failed deliveries (take first few parents)
-        const failedNumbers = parents.slice(0, Math.min(3, parents.length)).map((p: any) => p.phone_number);
-        setExtractedNumbers(failedNumbers);
-        setParsedContacts([]);
-        toast({ title: 'Failed Recipients Loaded', description: `Loaded ${failedNumbers.length} numbers to resend` });
-      }
+      toast({ title: 'Failed Recipients Loaded', description: `Loaded ${numbers.length} numbers to resend` });
     } catch (err) {
       console.error('Resend load error:', err);
       toast({ title: 'Load Failed', description: 'Could not load failed recipients to resend', variant: 'destructive' });
@@ -240,33 +250,30 @@ const MessageComposer: React.FC = () => {
       return;
     }
     try {
-      // For demo purposes, save to localStorage
-      const storedParents = localStorage.getItem('sms_parents');
-      let parents = storedParents ? JSON.parse(storedParents) : [];
-
       const seen = new Set<string>();
-      const newParents = parsedContacts
+      const parentsData = parsedContacts
         .filter(c => {
           if (seen.has(c.phone_number)) return false;
           seen.add(c.phone_number);
           return true;
         })
         .map(c => ({
-          id: Date.now() + Math.random(),
           phone_number: c.phone_number,
           name: c.name ?? undefined,
           student_name: c.student_name ?? undefined,
           class_year: c.class_year ?? undefined,
           region: c.region ?? undefined,
-          created_at: new Date().toISOString()
         }));
 
-      parents = [...parents, ...newParents];
-      localStorage.setItem('sms_parents', JSON.stringify(parents));
+      const { error } = await supabase
+        .from('parents')
+        .upsert(parentsData, { onConflict: 'phone_number' });
+
+      if (error) throw error;
 
       toast({
         title: 'Contacts Saved',
-        description: `Saved ${newParents.length} parent records.`,
+        description: `Saved ${parentsData.length} parent records.`,
       });
     } catch (error) {
       console.error('Error saving parents:', error);
@@ -294,32 +301,40 @@ const MessageComposer: React.FC = () => {
 
     setIsSending(true);
     try {
-      // For demo purposes - simulate SMS sending
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const uniqueToSend = Array.from(new Set(extractedNumbers));
 
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Store message in localStorage for history
-      const storedMessages = localStorage.getItem('sms_messages');
-      let messages = storedMessages ? JSON.parse(storedMessages) : [];
-
-      const newMessage = {
-        id: Date.now().toString(),
+      const messageData = {
+        admin_id: user.id,
         content: message,
         recipient_count: uniqueToSend.length,
-        success_count: Math.floor(uniqueToSend.length * 0.95), // 95% success rate
-        failed_count: Math.floor(uniqueToSend.length * 0.05),  // 5% failure rate
-        status: 'completed',
+        status: isScheduled ? 'scheduled' : 'pending',
         scheduled_at: isScheduled ? new Date(scheduledDateTime).toISOString() : null,
-        sent_at: new Date().toISOString(),
-        created_at: new Date().toISOString()
       };
 
-      messages.unshift(newMessage);
-      localStorage.setItem('sms_messages', JSON.stringify(messages));
+      const { data: messageRecord, error: messageError } = await supabase
+        .from('messages')
+        .insert(messageData)
+        .select()
+        .single();
+
+      if (messageError) throw messageError;
 
       if (!isScheduled) {
+        // Normalize to Briq expected format (e.g., 2557... without leading '+')
+        const briqRecipients = uniqueToSend.map(n => n.startsWith('+') ? n.substring(1) : n);
+        // Call Edge Function (send-sms) with messageId and phoneNumbers
+        const { error } = await supabase.functions.invoke('send-sms', {
+          body: {
+            messageId: messageRecord.id,
+            content: message,
+            phoneNumbers: briqRecipients,
+            sender_id: senderId || undefined,
+          },
+        });
+        if (error) throw error;
         toast({ title: 'Message Sent', description: `SMS sent to ${uniqueToSend.length} recipients` });
       } else {
         toast({ title: 'Message Scheduled', description: `SMS scheduled for ${new Date(scheduledDateTime).toLocaleString()}` });
@@ -404,9 +419,29 @@ const MessageComposer: React.FC = () => {
                     onClick={async () => {
                       try {
                         setIsTesting(true);
-                        // Simulate test SMS sending
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        toast({ title: 'Test Sent', description: `Sent test SMS to ${testNumber.trim()}` });
+                        const n = testNumber.trim();
+                        const normalized = n.startsWith('+') ? n.substring(1) : n;
+                        // Create a temporary message record for logging consistency
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (!user) throw new Error('User not authenticated');
+                        const tempMessage = {
+                          admin_id: user.id,
+                          content: message || 'Test from Edu Flash Notify',
+                          recipient_count: 1,
+                          status: 'pending' as const,
+                          scheduled_at: null as string | null,
+                        };
+                        const { data: tempMsgRecord, error: tempMsgErr } = await supabase
+                          .from('messages')
+                          .insert(tempMessage)
+                          .select()
+                          .single();
+                        if (tempMsgErr) throw tempMsgErr;
+                        const { error } = await supabase.functions.invoke('send-sms', {
+                          body: { messageId: tempMsgRecord.id, content: tempMessage.content, phoneNumbers: [normalized], sender_id: senderId || undefined },
+                        });
+                        if (error) throw error;
+                        toast({ title: 'Test Sent', description: `Sent test SMS to ${n}` });
                       } catch (e) {
                         console.error('Test send failed', e);
                         toast({ title: 'Test Failed', description: 'Could not send test SMS', variant: 'destructive' });
@@ -423,6 +458,11 @@ const MessageComposer: React.FC = () => {
           </div>
 
           <div className="space-y-3">
+            {hasSmsFunction === false && (
+              <div className="border border-destructive rounded-md p-3 text-destructive text-sm">
+                SMS function is not available. Ensure the <code>send-sms</code> edge function is deployed and reachable.
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <Label className="w-40">Recipient Source</Label>
               <Select value={recipientSource} onValueChange={(v) => setRecipientSource(v as any)}>
@@ -537,6 +577,42 @@ const MessageComposer: React.FC = () => {
                   </Button>
                   <Button variant="outline" onClick={loadFailedRecipientsForLastMessage} disabled={isProcessing}>
                     <RefreshCw className="w-4 h-4 mr-2" /> Resend to Not Delivered (Last Message)
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Failure statuses to include</Label>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    {['failed', 'undelivered', 'not_sent', 'expired', 'rejected'].map((s) => (
+                      <label key={s} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={failureStatuses.includes(s)}
+                          onChange={() => toggleFailureStatus(s)}
+                        />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">These statuses are used when loading failed recipients to resend.</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Label className="w-40">Previous Message</Label>
+                  <Select value={selectedMessageId} onValueChange={setSelectedMessageId}>
+                    <SelectTrigger className="w-[420px]">
+                      <SelectValue placeholder="Select a previous message" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {messagesList.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {new Date(m.created_at).toLocaleString()} — {m.content.slice(0, 40)}{m.content.length > 40 ? '…' : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="secondary" onClick={() => loadFailedRecipientsForMessage(selectedMessageId)} disabled={isProcessing || !selectedMessageId}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Load Not Delivered (Selected)
                   </Button>
                 </div>
               </div>

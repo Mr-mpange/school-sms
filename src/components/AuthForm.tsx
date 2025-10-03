@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, School, Mail, Lock, User, Building } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { authService } from '@/lib/auth';
 
 interface AuthFormProps {
   onAuthSuccess: () => void;
@@ -36,24 +36,28 @@ const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const result = await authService.login({
         email: loginData.email,
         password: loginData.password
       });
 
-      if (error) {
-        setError(error.message);
-        toast({
-          title: "Login Failed",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else {
+      if (result.success) {
         toast({
           title: "Login Successful",
           description: "Welcome back to your SMS dashboard!"
         });
+        // Store session token in localStorage
+        if (result.session) {
+          localStorage.setItem('sessionToken', result.session.token);
+        }
         onAuthSuccess();
+      } else {
+        setError(result.message);
+        toast({
+          title: "Login Failed",
+          description: result.message,
+          variant: "destructive"
+        });
       }
     } catch (err) {
       setError('An unexpected error occurred');
@@ -73,44 +77,31 @@ const AuthForm: React.FC<AuthFormProps> = ({ onAuthSuccess }) => {
     setError(null);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const result = await authService.register({
         email: signupData.email,
         password: signupData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: signupData.fullName,
-            school_name: signupData.schoolName
-          }
-        }
+        fullName: signupData.fullName,
+        schoolName: signupData.schoolName
       });
 
-      if (error) {
-        setError(error.message);
-        toast({
-          title: "Signup Failed",
-          description: error.message,
-          variant: "destructive"
-        });
-      } else if (data.user) {
-        // Insert admin record
-        const { error: adminError } = await supabase
-          .from('admins')
-          .insert({
-            id: data.user.id,
-            email: signupData.email,
-            password_hash: '', // This will be handled by Supabase Auth
-            full_name: signupData.fullName,
-            school_name: signupData.schoolName
-          });
-
-        if (adminError) {
-          console.error('Error creating admin record:', adminError);
-        }
-
+      if (result.success) {
         toast({
           title: "Account Created",
-          description: "Please check your email to verify your account."
+          description: "Your account has been created successfully!"
+        });
+        // Clear form
+        setSignupData({
+          email: '',
+          password: '',
+          fullName: '',
+          schoolName: ''
+        });
+      } else {
+        setError(result.message);
+        toast({
+          title: "Signup Failed",
+          description: result.message,
+          variant: "destructive"
         });
       }
     } catch (err) {
