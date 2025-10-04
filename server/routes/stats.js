@@ -1,6 +1,6 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
-const db = require('../../database/models');
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import db from '../../database/models/index.cjs'; // You’re using Sequelize with .cjs, that’s fine.
 
 const router = express.Router();
 
@@ -13,18 +13,14 @@ const authenticateToken = async (req, res, next) => {
       return res.status(401).json({ error: 'Access token required' });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     const adminId = decoded.adminId;
 
-    // Check if session exists in database
     const session = await db.Session.findOne({
       where: {
         admin_id: adminId,
         token: token,
-        expires_at: {
-          [db.Sequelize.Op.gt]: new Date()
-        }
+        expires_at: { [db.Sequelize.Op.gt]: new Date() }
       }
     });
 
@@ -40,32 +36,20 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-// Get dashboard statistics
+// ✅ GET dashboard statistics
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const adminId = req.adminId;
 
-    // Get real data from database
     const stats = {
-      totalMessages: 0,
-      totalParents: 0,
+      totalMessages: await db.Message.count({ where: { admin_id: adminId } }),
+      totalParents: await db.Parent.count({ where: { admin_id: adminId, is_active: true } }),
       successRate: 0,
       scheduledMessages: 0,
       totalSent: 0,
       totalFailed: 0
     };
 
-    // Get total messages count
-    stats.totalMessages = await db.Message.count({
-      where: { admin_id: adminId }
-    });
-
-    // Get total parents count
-    stats.totalParents = await db.Parent.count({
-      where: { admin_id: adminId, is_active: true }
-    });
-
-    // Get message delivery stats
     const messageStats = await db.Message.findOne({
       attributes: [
         [db.Sequelize.fn('SUM', db.Sequelize.col('sent_count')), 'totalSent'],
@@ -75,53 +59,37 @@ router.get('/', authenticateToken, async (req, res) => {
       raw: true
     });
 
-    stats.totalSent = parseInt(messageStats.totalSent) || 0;
-    stats.totalFailed = parseInt(messageStats.totalFailed) || 0;
+    stats.totalSent = parseInt(messageStats?.totalSent) || 0;
+    stats.totalFailed = parseInt(messageStats?.totalFailed) || 0;
 
-    // Calculate success rate
     const total = stats.totalSent + stats.totalFailed;
     stats.successRate = total > 0 ? Math.round((stats.totalSent / total) * 100) : 0;
 
-    // Get scheduled messages count
     stats.scheduledMessages = await db.Message.count({
       where: {
         admin_id: adminId,
         status: 'scheduled',
-        scheduled_at: {
-          [db.Sequelize.Op.gt]: new Date()
-        }
+        scheduled_at: { [db.Sequelize.Op.gt]: new Date() }
       }
     });
 
-    res.json({
-      success: true,
-      stats
-    });
-
+    res.json({ success: true, stats });
   } catch (error) {
     console.error('Error fetching stats:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to fetch dashboard statistics'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get messages with pagination and filters
+// ✅ GET messages with pagination and filters
 router.get('/messages', authenticateToken, async (req, res) => {
   try {
     const adminId = req.adminId;
     const { page = 1, limit = 10, status, search } = req.query;
 
     const offset = (page - 1) * limit;
-
-    // Build where clause
     const whereClause = { admin_id: adminId };
 
-    if (status) {
-      whereClause.status = status;
-    }
-
+    if (status) whereClause.status = status;
     if (search) {
       whereClause[db.Sequelize.Op.or] = [
         { recipient: { [db.Sequelize.Op.like]: `%${search}%` } },
@@ -148,25 +116,19 @@ router.get('/messages', authenticateToken, async (req, res) => {
         hasPrev: page > 1
       }
     });
-
   } catch (error) {
     console.error('Error fetching messages:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to fetch messages'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Get parents/contacts
+// ✅ GET parents/contacts
 router.get('/parents', authenticateToken, async (req, res) => {
   try {
     const adminId = req.adminId;
     const { page = 1, limit = 10, search } = req.query;
 
     const offset = (page - 1) * limit;
-
-    // Build where clause
     const whereClause = { admin_id: adminId, is_active: true };
 
     if (search) {
@@ -196,14 +158,11 @@ router.get('/parents', authenticateToken, async (req, res) => {
         hasPrev: page > 1
       }
     });
-
   } catch (error) {
     console.error('Error fetching parents:', error);
-    res.status(500).json({
-      error: 'Internal server error',
-      message: 'Failed to fetch parents'
-    });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-module.exports = router;
+// ✅ Export in ESM format
+export default router;

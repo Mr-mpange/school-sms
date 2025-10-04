@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
-import db from '../../database/models/index.js';
+import db from '../../database/models/index.cjs';
 
 const router = express.Router();
 

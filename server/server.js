@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Import database models
-import db from '../database/models/index.js';
+import db from '../database/models/index.cjs';
 
 // Import routes
 import authRoutes from './routes/auth.js';
